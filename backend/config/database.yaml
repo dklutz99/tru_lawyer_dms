@@ -1,0 +1,7 @@
+# tru_lawyer_dms/backend/config/database.yaml
+database:
+    host: localhost
+    port: 5432
+    dbname: documents
+    user: davidlutz
+    password: B2tF307010#1
