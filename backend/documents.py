@@ -45,3 +45,14 @@ async def upload_document(
         return {"id": document.id, "title": document.title, "minio_key": document.minio_key}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@router.get("/{document_id}/versions", response_model=list[dict])
+def list_document_versions(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    versions = db.query(DocumentVersion).filter(DocumentVersion.document_id == document_id).all()
+    return [{"version": v.version, "minio_key": v.minio_key, "created_at": v.created_at} for v in versions]

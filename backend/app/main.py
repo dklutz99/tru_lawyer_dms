@@ -21,6 +21,7 @@ app.add_middleware(
 
 app.include_router(documents.router)
 app.include_router(folders.router)
+app.include_router(onlyoffice.router)
 
 @app.get("/")
 def read_root():

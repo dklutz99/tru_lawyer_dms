@@ -25,7 +25,6 @@ minio_client = boto3.client(
     config=Config(signature_version='s3v4')
 )
 BUCKET_NAME = "documents"
-
 # ONLYOFFICE settings
 ONLYOFFICE_URL = "http://127.0.0.1:8080"  # Document Server URL
 JWT_SECRET = "your-onlyoffice-secret"     # Must match docker-compose
@@ -77,7 +76,6 @@ async def onlyoffice_callback(
     body: dict,
     db: Session = Depends(get_db)
 ):
-    # Handle ONLYOFFICE callback (e.g., save edited file)
     status = body.get("status")
     if status == 2:  # Document saved
         url = body.get("url")
@@ -85,18 +83,21 @@ async def onlyoffice_callback(
         if response.status_code == 200:
             document = db.query(Document).filter(Document.id == document_id).first()
             if document:
-                # Upload back to MinIO
+                version_num = db.query(DocumentVersion).filter(DocumentVersion.document_id == document.id).count() + 1
+                minio_key = f"{document.minio_key.rsplit('.', 1)[0]}_v{version_num}.{document.minio_key.rsplit('.', 1)[1]}"
                 minio_client.put_object(
                     Bucket=BUCKET_NAME,
-                    Key=document.minio_key,
+                    Key=minio_key,
                     Body=response.content
                 )
-                # Log action
+                version = DocumentVersion(document_id=document.id, version=version_num, minio_key=minio_key)
+                db.add(version)
+                db.commit()
                 audit = AuditLog(
-                    user_id=body.get("users", [None])[0],  # Simplified; use auth if needed
+                    user_id=body.get("users", [None])[0],
                     action="edit_document",
-                    details=f"Edited document: {document.title}"
+                    details=f"Edited document: {document.title}, version {version_num}"
                 )
                 db.add(audit)
                 db.commit()
-    return {"error": 0}  # ONLYOFFICE expects this response
+    return {"error": 0}
